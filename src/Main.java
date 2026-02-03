@@ -1,21 +1,142 @@
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import javax.imageio.ImageIO;
 
 public class Main {
+
+    // this variable will store the image after we load it
+    // we keep it here so other parts of the program can use it
+    static BufferedImage image = null;
+
+    // this is for showing simple info to the user
+    // later this will help when we start using thresholds
+    static JLabel infoLabel = new JLabel("Click load image to choose a file");
+
     public static void main(String[] args) {
+
+        // swing needs to run on its own thread
+        // this helps avoid weird bugs with the window
         SwingUtilities.invokeLater(() -> {
+
+            // for the main window
             JFrame frame = new JFrame("LesionTracker");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setSize(800, 600);
 
-            JLabel label = new JLabel("Day 1: Swing window is working", SwingConstants.CENTER);
-            frame.add(label);
+            // this button lets the user choose an image file
+            JButton loadButton = new JButton("load image");
 
+            // this panel will be used to draw the image
+            ImagePanel imagePanel = new ImagePanel();
+
+            // this runs when the button is clicked
+            loadButton.addActionListener(e -> {
+
+                // this opens a file picker
+                JFileChooser chooser = new JFileChooser();
+                int result = chooser.showOpenDialog(frame);
+
+                // this checks if the user actually selected a file
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    File file = chooser.getSelectedFile();
+
+                    try {
+                        // to read the image from the file
+                        image = ImageIO.read(file);
+
+                        // this tells the user what to do next
+                        infoLabel.setText("Click on the image to see pixel values");
+
+                        // to tell swing to redraw the panel
+                        imagePanel.repaint();
+                    } catch (Exception ex) {
+                        // this shows an error if the image fails to load
+                        JOptionPane.showMessageDialog(frame,
+                                "image could not be loaded");
+                    }
+                }
+            });
+
+            // a panel to hold the button at the top
+            JPanel topPanel = new JPanel();
+            topPanel.add(loadButton);
+
+            // a panel to hold the label at the bottom
+            JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            bottomPanel.add(infoLabel);
+
+            // this arranges everything in the window
+            frame.setLayout(new BorderLayout());
+            frame.add(topPanel, BorderLayout.NORTH);
+            frame.add(imagePanel, BorderLayout.CENTER);
+            frame.add(bottomPanel, BorderLayout.SOUTH);
+
+            // this centers the window on the screen
             frame.setLocationRelativeTo(null);
+
+            // this makes the window visible
             frame.setVisible(true);
         });
     }
-}
 
+    // for drawing the image on the screen
+    static class ImagePanel extends JPanel {
+
+        public ImagePanel() {
+
+            // this listens for mouse clicks on the panel
+            // we do this here because the image is drawn inside this panel
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+
+                    // if no image is loaded we do nothing
+                    if (image == null) {
+                        infoLabel.setText("load an image first");
+                        return;
+                    }
+
+                    int x = e.getX();
+                    int y = e.getY();
+
+                    // this checks if the click is inside the image
+                    if (x < 0 || y < 0 || x >= image.getWidth() || y >= image.getHeight()) {
+                        infoLabel.setText("click inside the image area");
+                        return;
+                    }
+
+                    // this gets the rgb value from the image
+                    int rgb = image.getRGB(x, y);
+
+                    // this makes it easier to read r g b separately
+                    Color c = new Color(rgb);
+
+                    // this shows the click position and pixel color
+                    // later we can use this for region growing thresholds
+                    infoLabel.setText("x " + x + " y " + y +
+                            "  r " + c.getRed() +
+                            " g " + c.getGreen() +
+                            " b " + c.getBlue());
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+
+            // if no image is loaded we show a message
+            if (image == null) {
+                g.drawString("Click load image to choose a file", 20, 20);
+                return;
+            }
+
+            // this draws the image starting from the top left corner
+            g.drawImage(image, 0, 0, null);
+        }
+    }
+}
