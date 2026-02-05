@@ -5,6 +5,8 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 public class Main {
 
@@ -15,6 +17,14 @@ public class Main {
     // this is for showing simple info to the user
     // later this will help when we start using thresholds
     static JLabel infoLabel = new JLabel("Click load image to choose a file");
+
+    // bfs region growing prototype - storing the pixels and the starting pixels, how many are selected, how similar they need to be
+    static boolean[][] selected = null;
+    static int selectedCount = 0;
+    static int threshold = 35;
+    
+    static int startX = -1;
+    static int startY = -1;
 
     public static void main(String[] args) {
 
@@ -29,7 +39,7 @@ public class Main {
 
             // this button lets the user choose an image file
             JButton loadButton = new JButton("load image");
-
+            
             // this panel will be used to draw the image
             ImagePanel imagePanel = new ImagePanel();
 
@@ -47,6 +57,12 @@ public class Main {
                     try {
                         // to read the image from the file
                         image = ImageIO.read(file);
+                        
+                        // reset bfs data for the new image
+                        selected = new boolean[image.getHeight()][image.getWidth()];
+                        selectedCount = 0;
+                        startX = -1;
+                        startY = -1;
 
                         // this tells the user what to do next
                         infoLabel.setText("Click on the image to see pixel values");
@@ -83,6 +99,80 @@ public class Main {
         });
     }
 
+    // this starts selecting nearby pixels from the clicked one
+    static void runRegionGrow(int startX, int startY) {
+
+        int w = image.getWidth();
+        int h = image.getHeight();
+
+        selected = new boolean[h][w];
+        selectedCount = 0;
+
+        int startRgb = image.getRGB(startX, startY);
+
+        Deque<Point> queue = new ArrayDeque<>();
+        queue.add(new Point(startX, startY));
+        selected[startY][startX] = true;
+        selectedCount = 1;
+
+        while (!queue.isEmpty()) {
+            Point p = queue.removeFirst();
+
+            int x = p.x;
+            int y = p.y;
+
+            tryAdd(x + 1, y, startRgb, queue, w, h);
+            tryAdd(x - 1, y, startRgb, queue, w, h);
+            tryAdd(x, y + 1, startRgb, queue, w, h);
+            tryAdd(x, y - 1, startRgb, queue, w, h);
+
+            if (selectedCount > 80000) break;
+        }
+    }
+
+    // this checks a neighbor pixel and adds it if it is similar enough
+    static void tryAdd(int x, int y, int startRgb, Deque<Point> queue, int w, int h) {
+
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        if (selected[y][x]) return;
+
+        int rgb = image.getRGB(x, y);
+
+        if (closeEnough(rgb, startRgb)) {
+            selected[y][x] = true;
+            selectedCount++;
+            queue.add(new Point(x, y));
+        }
+    }
+
+    // this compares two pixels and checks if their colors are close
+    static boolean closeEnough(int a, int b) {
+
+        Color c1 = new Color(a);
+        Color c2 = new Color(b);
+
+        int diff =
+                Math.abs(c1.getRed() - c2.getRed()) +
+                Math.abs(c1.getGreen() - c2.getGreen()) +
+                Math.abs(c1.getBlue() - c2.getBlue());
+
+        return diff <= threshold;
+    }
+    
+        // checks if this pixel is on the border of the selected area
+        static boolean isEdge(int x, int y, int w, int h) {
+            if (!selected[y][x]) return false;
+        
+            if (x == 0 || y == 0 || x == w - 1 || y == h - 1) return true;
+        
+            if (!selected[y][x - 1]) return true;
+            if (!selected[y][x + 1]) return true;
+            if (!selected[y - 1][x]) return true;
+            if (!selected[y + 1][x]) return true;
+        
+            return false;
+        }
+       
     // for drawing the image on the screen
     static class ImagePanel extends JPanel {
 
@@ -114,29 +204,55 @@ public class Main {
 
                     // this makes it easier to read r g b separately
                     Color c = new Color(rgb);
+                    
+                    // start region growing from clicked pixel
+                    startX = x;
+                    startY = y;
+                  
+                    // new for bfs
+                    runRegionGrow(x, y);
 
                     // this shows the click position and pixel color
                     // later we can use this for region growing thresholds
                     infoLabel.setText("x " + x + " y " + y +
                             "  r " + c.getRed() +
                             " g " + c.getGreen() +
-                            " b " + c.getBlue());
+                            " b " + c.getBlue() +
+                            " selected " + selectedCount);
+
+                    repaint();
                 }
             });
         }
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+    
+                // if no image is loaded we show a message
+                if (image == null) {
+                    return;
+                }
+    
+                // this draws the image starting from the top left corner
+                g.drawImage(image, 0, 0, null);
+    
+                // this draws the selected region on top of the image
+                if (selected != null) {
+                    int w = image.getWidth();
+                    int h = image.getHeight();
+                
+                    g.setColor(new Color(255, 0, 0, 180));
+                
+                    for (int yy = 0; yy < h; yy++) {
+                        for (int xx = 0; xx < w; xx++) {
+                            if (isEdge(xx, yy, w, h)) {
+                                g.fillRect(xx, yy, 1, 1);
+                            }
+                        }
+                    }
+                }
 
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-
-            // if no image is loaded we show a message
-            if (image == null) {
-                g.drawString("Click load image to choose a file", 20, 20);
-                return;
             }
 
-            // this draws the image starting from the top left corner
-            g.drawImage(image, 0, 0, null);
-        }
     }
 }
