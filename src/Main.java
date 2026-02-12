@@ -1,12 +1,14 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import javax.imageio.ImageIO;
+import java.time.LocalDate;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.time.LocalTime;
+
+
 
 public class Main {
 
@@ -21,10 +23,17 @@ public class Main {
     // bfs region growing prototype - storing the pixels and the starting pixels, how many are selected, how similar they need to be
     static boolean[][] selected = null;
     static int selectedCount = 0;
-    static int threshold = 35;
+    static int threshold = 60;
     
     static int startX = -1;
     static int startY = -1;
+
+    // path of the currently loaded image (used when saving results)
+    static String currentImagePath = "";
+
+    // stores the most recent analysis result
+    static AnalysisResult currentResult = null;
+
 
     public static void main(String[] args) {
 
@@ -39,7 +48,13 @@ public class Main {
 
             // this button lets the user choose an image file
             JButton loadButton = new JButton("load image");
-            
+
+            // new buttons for analysis and saving results and comparing latest two saved images
+            JButton analyzeButton = new JButton("analyze");
+            JButton saveButton = new JButton("save");
+            JButton compareButton = new JButton("compare latest 2");
+
+
             // this panel will be used to draw the image
             ImagePanel imagePanel = new ImagePanel();
 
@@ -53,6 +68,9 @@ public class Main {
                 // this checks if the user actually selected a file
                 if (result == JFileChooser.APPROVE_OPTION) {
                     File file = chooser.getSelectedFile();
+
+                    // store the path of the loaded image for saving results later
+                    currentImagePath = file.getAbsolutePath();
 
                     try {
                         // to read the image from the file
@@ -77,9 +95,88 @@ public class Main {
                 }
             });
 
+            // this runs when the analyze button is clicked
+            analyzeButton.addActionListener(e -> {
+
+                if (image == null) {
+                    infoLabel.setText("load an image first");
+                    return;
+                }
+
+                String today = LocalDate.now().toString();
+
+                String dateInput = (String) JOptionPane.showInputDialog(
+                        frame,
+                        "enter date (YYYY-MM-DD) or leave blank for today",
+                        "date",
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        null,
+                        today
+                );
+
+                LocalDate date;
+                try {
+                    if (dateInput == null || dateInput.trim().isEmpty()) {
+                        date = LocalDate.now();
+                    } else {
+                        date = LocalDate.parse(dateInput.trim());
+                    }
+                } catch (Exception ex) {
+                    date = LocalDate.now();
+                }
+
+                LocalTime time = LocalTime.now();
+
+
+                // if bfs selection exists analyze that region
+                if (selected != null && selectedCount > 0) {
+                    currentResult = LesionAnalyzer.analyzeFromSelected(
+                            image, selected, currentImagePath, date, time);
+                } else {
+                    // no selection yet -> tell the user to click + select first
+                    infoLabel.setText("select a region first (click image) then analyze");
+                    return;
+                }
+
+
+                infoLabel.setText("pixels " + currentResult.lesionPixelCount +
+                        " avg rgb " +
+                        String.format("%.2f", currentResult.avgR) + " " +
+                        String.format("%.2f", currentResult.avgG) + " " +
+                        String.format("%.2f", currentResult.avgB));
+            });
+
+            // this runs when the save button is clicked
+            saveButton.addActionListener(e -> {
+
+                if (currentResult == null) {
+                    infoLabel.setText("run analyze first");
+                    return;
+                }
+
+                // save to file (txt)
+                ResultStorage.save(currentResult);
+                infoLabel.setText("saved (check data folder)");
+
+            });
+
+            // this runs when compare is clicked
+            compareButton.addActionListener(e -> {
+
+                java.util.List<AnalysisResult> all = ResultStorage.loadAll();
+
+                String text = Comparer.compareLatestTwo(all);
+
+                JOptionPane.showMessageDialog(frame, text);
+            });
+
             // a panel to hold the button at the top
             JPanel topPanel = new JPanel();
             topPanel.add(loadButton);
+            topPanel.add(analyzeButton);
+            topPanel.add(saveButton);
+            topPanel.add(compareButton);
 
             // a panel to hold the label at the bottom
             JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -158,18 +255,17 @@ public class Main {
 
         return diff <= threshold;
     }
-    
+
         // checks if this pixel is on the border of the selected area
         static boolean isEdge(int x, int y, int w, int h) {
+
+            // already selected?
             if (!selected[y][x]) return false;
-        
+
+            // border of image is automatically an edge
             if (x == 0 || y == 0 || x == w - 1 || y == h - 1) return true;
-        
-            if (!selected[y][x - 1]) return true;
-            if (!selected[y][x + 1]) return true;
-            if (!selected[y - 1][x]) return true;
-            if (!selected[y + 1][x]) return true;
-        
-            return false;
+
+            // edge if any 4-neighbor is not selected
+            return !selected[y][x - 1] || !selected[y][x + 1] || !selected[y - 1][x] || !selected[y + 1][x];
         }
 }
