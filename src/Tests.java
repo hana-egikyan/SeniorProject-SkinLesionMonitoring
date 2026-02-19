@@ -1,4 +1,3 @@
-import java.awt.image.BufferedImage;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -45,7 +44,7 @@ public class Tests {
         assertTrue(saved != null && saved.exists(), "ResultStorage.save creates a txt file");
 
         List<AnalysisResult> all = ResultStorage.loadAll();
-        assertTrue(all.size() >= 1, "ResultStorage.loadAll returns at least 1 result");
+        assertTrue(!all.isEmpty(), "ResultStorage.loadAll returns at least 1 result");
     }
 
     // this checks compare works when we have at least two results
@@ -73,7 +72,7 @@ public class Tests {
         List<AnalysisResult> all = ResultStorage.loadAll();
         String text = Comparer.compareLatestTwo(all);
 
-        assertTrue(text != null && text.length() > 0, "Comparer.compareLatestTwo returns text");
+        assertTrue(!text.isEmpty(), "Comparer.compareLatestTwo returns text");
         assertTrue(text.contains("Comparing latest two"), "compare text contains header");
     }
 }

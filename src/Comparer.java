@@ -1,4 +1,3 @@
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -14,19 +13,13 @@ public class Comparer {
         }
 
         // sort by date then time so the newest is at the end
-        Collections.sort(all, new Comparator<AnalysisResult>() {
-            @Override
-            public int compare(AnalysisResult a, AnalysisResult b) {
+        all.sort(
+                Comparator.comparing((AnalysisResult a) -> a.date)
+                        .thenComparing(a -> a.time)
+        );
 
-                int d = a.date.compareTo(b.date);
-                if (d != 0) return d;
-
-                return a.time.compareTo(b.time);
-            }
-        });
-
-        AnalysisResult prev = all.get(all.size() - 2);
-        AnalysisResult last = all.get(all.size() - 1);
+        AnalysisResult last = all.getLast();                 // newest
+        AnalysisResult prev = all.get(all.size() - 2);       // second newest
 
         int diffPixels = last.lesionPixelCount - prev.lesionPixelCount;
 

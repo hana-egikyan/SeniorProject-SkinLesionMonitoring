@@ -38,8 +38,20 @@ public class ImagePanel extends JPanel {
                 Main.startX = x;
                 Main.startY = y;
 
-                // new for bfs
-                Main.runRegionGrow(x, y);
+                // read rgb range from the UI text fields in Main
+                int minR = Main.parseIntSafe(Main.minRField.getText(), 0);
+                int maxR = Main.parseIntSafe(Main.maxRField.getText(), 255);
+                int minG = Main.parseIntSafe(Main.minGField.getText(), 0);
+                int maxG = Main.parseIntSafe(Main.maxGField.getText(), 255);
+                int minB = Main.parseIntSafe(Main.minBField.getText(), 0);
+                int maxB = Main.parseIntSafe(Main.maxBField.getText(), 255);
+
+                // create a range object that will control which pixels are allowed in the region
+                RgbRange range = new RgbRange(minR, maxR, minG, maxG, minB, maxB);
+
+                // run region growing using the selected rgb range
+                Main.runRegionGrow(x, y, range);
+
 
                 // this shows the click position and pixel color
                 // later we can use this for region growing thresholds

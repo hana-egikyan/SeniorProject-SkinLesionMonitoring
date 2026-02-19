@@ -23,8 +23,7 @@ public class Main {
     // bfs region growing prototype - storing the pixels and the starting pixels, how many are selected, how similar they need to be
     static boolean[][] selected = null;
     static int selectedCount = 0;
-    static int threshold = 60;
-    
+
     static int startX = -1;
     static int startY = -1;
 
@@ -34,6 +33,15 @@ public class Main {
     // stores the most recent analysis result
     static AnalysisResult currentResult = null;
 
+    // rgb range input files - ui for color range detection
+    static JTextField minRField = new JTextField("0", 3);
+    static JTextField maxRField = new JTextField("255", 3);
+    static JTextField minGField = new JTextField("0", 3);
+    static JTextField maxGField = new JTextField("255", 3);
+    static JTextField minBField = new JTextField("0", 3);
+    static JTextField maxBField = new JTextField("255", 3);
+
+    static JTextField toleranceField = new JTextField("20", 3);
 
     public static void main(String[] args) {
 
@@ -53,6 +61,7 @@ public class Main {
             JButton analyzeButton = new JButton("analyze");
             JButton saveButton = new JButton("save");
             JButton compareButton = new JButton("compare latest 2");
+            JButton autoFillButton = new JButton("use clicked color");
 
 
             // this panel will be used to draw the image
@@ -128,6 +137,19 @@ public class Main {
 
                 LocalTime time = LocalTime.now();
 
+                int minR = parseIntSafe(minRField.getText(), 0);
+                int maxR = parseIntSafe(maxRField.getText(), 255);
+                int minG = parseIntSafe(minGField.getText(), 0);
+                int maxG = parseIntSafe(maxGField.getText(), 255);
+                int minB = parseIntSafe(minBField.getText(), 0);
+                int maxB = parseIntSafe(maxBField.getText(), 255);
+
+                RgbRange range = new RgbRange(minR, maxR, minG, maxG, minB, maxB);
+
+                // if user has already clicked on the image, re-run region growing
+                if (startX >= 0 && startY >= 0) {
+                    runRegionGrow(startX, startY, range);
+                }
 
                 // if bfs selection exists analyze that region
                 if (selected != null && selectedCount > 0) {
@@ -171,12 +193,71 @@ public class Main {
                 JOptionPane.showMessageDialog(frame, text);
             });
 
+
+            // this runs when the "use clicked color" button is pressed
+            autoFillButton.addActionListener(e -> {
+
+                if (image == null) {
+                    infoLabel.setText("load an image first");
+                    return;
+                }
+
+                if (startX < 0 || startY < 0) {
+                    infoLabel.setText("click on the image first");
+                    return;
+                }
+
+                int tol = parseIntSafe(toleranceField.getText(), 20);     // if the user types something invalid to use 20 as default
+
+
+                int rgb = image.getRGB(startX, startY);
+                Color c = new Color(rgb);
+
+                int r = c.getRed();
+                int g = c.getGreen();
+                int b = c.getBlue();
+
+                // new rgb range around the clicked pixel and tol decides how wide it should be
+                RgbRange range = RgbRange.around(r, g, b, tol);
+
+                minRField.setText(String.valueOf(range.minR));
+                maxRField.setText(String.valueOf(range.maxR));
+                minGField.setText(String.valueOf(range.minG));
+                maxGField.setText(String.valueOf(range.maxG));
+                minBField.setText(String.valueOf(range.minB));
+                maxBField.setText(String.valueOf(range.maxB));
+
+                infoLabel.setText("RGB range auto-filled from clicked pixel");
+            });
+
+
             // a panel to hold the button at the top
             JPanel topPanel = new JPanel();
             topPanel.add(loadButton);
             topPanel.add(analyzeButton);
             topPanel.add(saveButton);
             topPanel.add(compareButton);
+            topPanel.add(autoFillButton);
+
+            topPanel.add(new JLabel("tol:"));
+            topPanel.add(toleranceField);
+
+            // rgb range controls
+            topPanel.add(new JLabel("R:"));
+            topPanel.add(minRField);
+            topPanel.add(new JLabel("-"));
+            topPanel.add(maxRField);
+
+            topPanel.add(new JLabel("G:"));
+            topPanel.add(minGField);
+            topPanel.add(new JLabel("-"));
+            topPanel.add(maxGField);
+
+            topPanel.add(new JLabel("B:"));
+            topPanel.add(minBField);
+            topPanel.add(new JLabel("-"));
+            topPanel.add(maxBField);
+
 
             // a panel to hold the label at the bottom
             JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -196,8 +277,18 @@ public class Main {
         });
     }
 
+    static int parseIntSafe(String s, int fallback) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
     // this starts selecting nearby pixels from the clicked one
-    static void runRegionGrow(int startX, int startY) {
+    static void runRegionGrow(int startX, int startY, RgbRange range) {
+
+        if (image == null || range == null) return;
 
         int w = image.getWidth();
         int h = image.getHeight();
@@ -205,55 +296,44 @@ public class Main {
         selected = new boolean[h][w];
         selectedCount = 0;
 
-        int startRgb = image.getRGB(startX, startY);
-
         Deque<Point> queue = new ArrayDeque<>();
         queue.add(new Point(startX, startY));
         selected[startY][startX] = true;
         selectedCount = 1;
 
         while (!queue.isEmpty()) {
-            Point p = queue.removeFirst();
 
+            Point p = queue.removeFirst();
             int x = p.x;
             int y = p.y;
 
-            tryAdd(x + 1, y, startRgb, queue, w, h);
-            tryAdd(x - 1, y, startRgb, queue, w, h);
-            tryAdd(x, y + 1, startRgb, queue, w, h);
-            tryAdd(x, y - 1, startRgb, queue, w, h);
+            tryAdd(x + 1, y, range, queue, w, h);
+            tryAdd(x - 1, y, range, queue, w, h);
+            tryAdd(x, y + 1, range, queue, w, h);
+            tryAdd(x, y - 1, range, queue, w, h);
 
             if (selectedCount > 80000) break;
         }
     }
 
-    // this checks a neighbor pixel and adds it if it is similar enough
-    static void tryAdd(int x, int y, int startRgb, Deque<Point> queue, int w, int h) {
+
+    // this checks a neighbor pixel and adds it if it matches the rgb range
+    static void tryAdd(int x, int y,
+                       RgbRange range,
+                       Deque<Point> queue,
+                       int w, int h) {
 
         if (x < 0 || y < 0 || x >= w || y >= h) return;
         if (selected[y][x]) return;
 
         int rgb = image.getRGB(x, y);
+        Color c = new Color(rgb);
 
-        if (closeEnough(rgb, startRgb)) {
+        if (range.contains(c.getRed(), c.getGreen(), c.getBlue())) {
             selected[y][x] = true;
             selectedCount++;
             queue.add(new Point(x, y));
         }
-    }
-
-    // this compares two pixels and checks if their colors are close
-    static boolean closeEnough(int a, int b) {
-
-        Color c1 = new Color(a);
-        Color c2 = new Color(b);
-
-        int diff =
-                Math.abs(c1.getRed() - c2.getRed()) +
-                Math.abs(c1.getGreen() - c2.getGreen()) +
-                Math.abs(c1.getBlue() - c2.getBlue());
-
-        return diff <= threshold;
     }
 
         // checks if this pixel is on the border of the selected area

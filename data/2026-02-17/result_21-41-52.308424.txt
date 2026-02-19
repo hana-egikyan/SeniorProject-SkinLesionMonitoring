@@ -1,0 +1,8 @@
+imagePath=/Users/hannahegikyan/Desktop/LesionTracker/Screenshot 2026-02-12 at 8.33.19 PM.png
+date=2026-02-17
+time=21:41:51.509347
+lesionPixelCount=460
+avgR=181.22
+avgG=133.31
+avgB=110.35
+

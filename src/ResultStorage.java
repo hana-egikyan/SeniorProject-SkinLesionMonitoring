@@ -6,11 +6,49 @@ import java.util.List;
 // this is for saving + loading results
 public class ResultStorage {
 
+    // tries to create a folder if it does not exist
+    // returns true if the folder exists after this (created or already existed)
+    private static boolean ensureDirExists(File dir) {
+        if (dir == null) return false;
+
+        if (dir.exists()) {
+            return dir.isDirectory();
+        }
+
+        // mkdirs returns true if it successfully created the directory
+        // or false if it failed
+        return dir.mkdirs();
+    }
+
+    // simple error logging to a text file (no external libraries)
+    private static void logError(String message, Exception e) {
+        System.err.println(message);
+        if (e != null) System.err.println(e.getMessage());
+
+        File logFile = new File("data" + File.separator + "errors.log");
+
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(logFile, true))) {
+            bw.write("[" + java.time.LocalDateTime.now() + "] " + message);
+            bw.newLine();
+
+            if (e != null) {
+                bw.write("Exception: " + e);
+                bw.newLine();
+            }
+
+            bw.newLine();
+        } catch (IOException ignored) {
+            // if logging fails we do not want the program to crash
+        }
+    }
+
     private static File buildResultFile(LocalDate date) {
         File dir = new File("data" + File.separator + date.toString());
-        if (!dir.exists()) {
-            // create folder for that day
-            dir.mkdirs();
+
+        // create folder for that day (and check if it worked)
+        boolean created = ensureDirExists(dir);
+        if (!created) {
+            logError("Could not create folder: " + dir.getAbsolutePath(), null);
         }
 
         String fileName = "result_" + java.time.LocalTime.now().toString().replace(':', '-') + ".txt";
@@ -26,8 +64,9 @@ public class ResultStorage {
             File file = buildResultFile(result.date);
 
             File parent = file.getParentFile();
-            if (parent != null && !parent.exists()) {
-                parent.mkdirs();
+            if (parent != null && !ensureDirExists(parent)) {
+                logError("Could not create parent folder: " + parent.getAbsolutePath(), null);
+                return null;
             }
 
             try (BufferedWriter bw = new BufferedWriter(new FileWriter(file, true))) {
@@ -38,7 +77,7 @@ public class ResultStorage {
             return file;
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logError("Failed to save result.", e);
             return null;
         }
     }
@@ -70,7 +109,7 @@ public class ResultStorage {
                         sb.append(line).append("\n");
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logError("Failed to read file: " + f.getAbsolutePath(), e);
                     continue;
                 }
 
