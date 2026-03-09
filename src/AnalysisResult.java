@@ -21,9 +21,39 @@ public class AnalysisResult {
     double avgG;
     double avgB;
 
+    // extra extracted features (color variance)
+    double varR;
+    double varG;
+    double varB;
+
+    // parameters used for segmentation
+    int toleranceUsed;
+    int minR;
+    int maxR;
+    int minG;
+    int maxG;
+    int minB;
+    int maxB;
+
     // constructor used by the analyzer = storage for the values
-    public AnalysisResult(String imagePath, LocalDate date, LocalTime time,
-                          int lesionPixelCount, double avgR, double avgG, double avgB) {
+    public AnalysisResult(String imagePath,
+                          LocalDate date,
+                          LocalTime time,
+                          int lesionPixelCount,
+                          double avgR,
+                          double avgG,
+                          double avgB,
+                          double varR,
+                          double varG,
+                          double varB,
+                          int toleranceUsed,
+                          int minR,
+                          int maxR,
+                          int minG,
+                          int maxG,
+                          int minB,
+                          int maxB) {
+
         this.imagePath = imagePath;
         this.date = date;
         this.time = time;
@@ -31,6 +61,17 @@ public class AnalysisResult {
         this.avgR = avgR;
         this.avgG = avgG;
         this.avgB = avgB;
+        this.varR = varR;
+        this.varG = varG;
+        this.varB = varB;
+
+        this.toleranceUsed = toleranceUsed;
+        this.minR = minR;
+        this.maxR = maxR;
+        this.minG = minG;
+        this.maxG = maxG;
+        this.minB = minB;
+        this.maxB = maxB;
     }
 
     // convert to a readable .txt format
@@ -42,7 +83,17 @@ public class AnalysisResult {
                 "lesionPixelCount=" + lesionPixelCount + "\n" +
                 "avgR=" + String.format("%.2f", avgR) + "\n" +
                 "avgG=" + String.format("%.2f", avgG) + "\n" +
-                "avgB=" + String.format("%.2f", avgB) + "\n";
+                "avgB=" + String.format("%.2f", avgB) + "\n" +
+                "varR=" + String.format("%.2f", varR) + "\n" +
+                "varG=" + String.format("%.2f", varG) + "\n" +
+                "varB=" + String.format("%.2f", varB) + "\n" +
+                "toleranceUsed=" + toleranceUsed + "\n" +
+                "minR=" + minR + "\n" +
+                "maxR=" + maxR + "\n" +
+                "minG=" + minG + "\n" +
+                "maxG=" + maxG + "\n" +
+                "minB=" + minB + "\n" +
+                "maxB=" + maxB + "\n";
     }
 
     // helper used by ResultStorage.loadAll()
@@ -54,9 +105,22 @@ public class AnalysisResult {
         LocalDate date = LocalDate.now();
         LocalTime time = LocalTime.now();
         int count = 0;
+
         double avgR = 0;
         double avgG = 0;
         double avgB = 0;
+
+        double varR = 0;
+        double varG = 0;
+        double varB = 0;
+
+        int toleranceUsed = 0;
+        int minR = 0;
+        int maxR = 0;
+        int minG = 0;
+        int maxG = 0;
+        int minB = 0;
+        int maxB = 0;
 
         String[] lines = text.split("\\R"); // split on any newline
 
@@ -77,12 +141,30 @@ public class AnalysisResult {
                     case "avgR" -> avgR = Double.parseDouble(value);
                     case "avgG" -> avgG = Double.parseDouble(value);
                     case "avgB" -> avgB = Double.parseDouble(value);
+                    case "varR" -> varR = Double.parseDouble(value);
+                    case "varG" -> varG = Double.parseDouble(value);
+                    case "varB" -> varB = Double.parseDouble(value);
+                    case "toleranceUsed" -> toleranceUsed = Integer.parseInt(value);
+                    case "minR" -> minR = Integer.parseInt(value);
+                    case "maxR" -> maxR = Integer.parseInt(value);
+                    case "minG" -> minG = Integer.parseInt(value);
+                    case "maxG" -> maxG = Integer.parseInt(value);
+                    case "minB" -> minB = Integer.parseInt(value);
+                    case "maxB" -> maxB = Integer.parseInt(value);
                 }
             } catch (Exception ignored) {
                 // if a line is not how it should be, ignore it
             }
         }
 
-        return new AnalysisResult(imagePath, date, time, count, avgR, avgG, avgB);
+        return new AnalysisResult(
+                imagePath, date, time, count,
+                avgR, avgG, avgB,
+                varR, varG, varB,
+                toleranceUsed,
+                minR, maxR,
+                minG, maxG,
+                minB, maxB
+        );
     }
 }

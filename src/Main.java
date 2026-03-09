@@ -42,8 +42,8 @@ public class Main {
     static JTextField maxBField = new JTextField("255", 3);
 
     static JTextField toleranceField = new JTextField("20", 3);
-
-    public static void main(String[] args) {
+    public static void main(String[] args)
+     {
 
         // swing needs to run on its own thread
         // this helps avoid weird bugs with the window
@@ -62,6 +62,7 @@ public class Main {
             JButton saveButton = new JButton("save");
             JButton compareButton = new JButton("compare latest 2");
             JButton autoFillButton = new JButton("use clicked color");
+            JButton forecastButton = new JButton("forecast");
 
 
             // this panel will be used to draw the image
@@ -84,7 +85,7 @@ public class Main {
                     try {
                         // to read the image from the file
                         image = ImageIO.read(file);
-                        
+
                         // reset bfs data for the new image
                         selected = new boolean[image.getHeight()][image.getWidth()];
                         selectedCount = 0;
@@ -109,6 +110,11 @@ public class Main {
 
                 if (image == null) {
                     infoLabel.setText("load an image first");
+                    return;
+                }
+
+                if (startX < 0 || startY < 0) {
+                    setStage("click on the lesion first");
                     return;
                 }
 
@@ -144,6 +150,8 @@ public class Main {
                 int minB = parseIntSafe(minBField.getText(), 0);
                 int maxB = parseIntSafe(maxBField.getText(), 255);
 
+                int tol = parseIntSafe(toleranceField.getText(), 20);
+
                 RgbRange range = new RgbRange(minR, maxR, minG, maxG, minB, maxB);
 
                 // if user has already clicked on the image, re-run region growing
@@ -151,22 +159,58 @@ public class Main {
                     runRegionGrow(startX, startY, range);
                 }
 
+                int count1 = selectedCount;
+
+                runRegionGrow(startX, startY, range);
+
+                int count2 = selectedCount;
+
+                if (count1 != count2) {
+                    setStage("acceptance: FAIL stability (" + count1 + " vs " + count2 + ")");
+                    infoLabel.setText("stability failed, try again or adjust thresholds");
+                    return;
+                }
+
                 // if bfs selection exists analyze that region
                 if (selected != null && selectedCount > 0) {
                     currentResult = LesionAnalyzer.analyzeFromSelected(
-                            image, selected, currentImagePath, date, time);
+                            image, selected, currentImagePath, date, time,
+                            tol,
+                            minR, maxR,
+                            minG, maxG,
+                            minB, maxB
+                    );
                 } else {
                     // no selection yet -> tell the user to click + select first
                     infoLabel.setText("select a region first (click image) then analyze");
                     return;
                 }
 
+                // acceptance criteria check (basic correctness rules)
+                String verdict = AcceptanceCriteria.validate(
+                        selected,
+                        image.getWidth(),
+                        image.getHeight(),
+                        currentResult,
+                        selectedCount
+                );
+
+                // show pass/fail clearly
+                setStage("acceptance: " + verdict);
 
                 infoLabel.setText("pixels " + currentResult.lesionPixelCount +
                         " avg rgb " +
                         String.format("%.2f", currentResult.avgR) + " " +
                         String.format("%.2f", currentResult.avgG) + " " +
-                        String.format("%.2f", currentResult.avgB));
+                        String.format("%.2f", currentResult.avgB) +
+                        " var rgb " +
+                        String.format("%.2f", currentResult.varR) + " " +
+                        String.format("%.2f", currentResult.varG) + " " +
+                        String.format("%.2f", currentResult.varB));
+
+                setStage("acceptance: " + verdict);
+                imagePanel.repaint();
+
             });
 
             // this runs when the save button is clicked
@@ -191,6 +235,26 @@ public class Main {
                 String text = Comparer.compareLatestTwo(all);
 
                 JOptionPane.showMessageDialog(frame, text);
+            });
+
+            // this runs when forecast is clicked
+            forecastButton.addActionListener(e -> {
+
+                setStage("loading saved results...");
+
+                java.util.List<AnalysisResult> all = ResultStorage.loadAll();
+
+                // DEBUG: show how many results were loaded
+                JOptionPane.showMessageDialog(frame, "loaded results: " + all.size());
+
+                setStage("computing forecast...");
+
+                TemporalForecaster.ForecastReport report =
+                        TemporalForecaster.buildReport(all, 7); // project 7 days ahead
+
+                setStage("done");
+
+                JOptionPane.showMessageDialog(frame, report.toText());
             });
 
 
@@ -258,6 +322,7 @@ public class Main {
             topPanel.add(new JLabel("-"));
             topPanel.add(maxBField);
 
+            topPanel.add(forecastButton);
 
             // a panel to hold the label at the bottom
             JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -277,6 +342,11 @@ public class Main {
         });
     }
 
+    // small helper so we can show what stage we are in that uses SwingUtilities so it updates safely
+    static void setStage(String text) {
+        SwingUtilities.invokeLater(() -> infoLabel.setText("Stage: " + text));
+    }
+
     static int parseIntSafe(String s, int fallback) {
         try {
             return Integer.parseInt(s.trim());
@@ -286,9 +356,13 @@ public class Main {
     }
 
     // this starts selecting nearby pixels from the clicked one
+    // runs region growing starting from the clicked pixel
     static void runRegionGrow(int startX, int startY, RgbRange range) {
 
         if (image == null || range == null) return;
+
+        // show what is happening in the UI
+        setStage("region growing...");
 
         int w = image.getWidth();
         int h = image.getHeight();
@@ -297,6 +371,8 @@ public class Main {
         selectedCount = 0;
 
         Deque<Point> queue = new ArrayDeque<>();
+
+        // start from the seed
         queue.add(new Point(startX, startY));
         selected[startY][startX] = true;
         selectedCount = 1;
@@ -307,15 +383,19 @@ public class Main {
             int x = p.x;
             int y = p.y;
 
+            // expand to 4 neighbors
             tryAdd(x + 1, y, range, queue, w, h);
             tryAdd(x - 1, y, range, queue, w, h);
             tryAdd(x, y + 1, range, queue, w, h);
             tryAdd(x, y - 1, range, queue, w, h);
 
+            // safety stop so it cannot grow forever
             if (selectedCount > 80000) break;
         }
-    }
 
+        // show end stage + result size
+        setStage("region growing done (selected " + selectedCount + ")");
+    }
 
     // this checks a neighbor pixel and adds it if it matches the rgb range
     static void tryAdd(int x, int y,
@@ -336,16 +416,16 @@ public class Main {
         }
     }
 
-        // checks if this pixel is on the border of the selected area
-        static boolean isEdge(int x, int y, int w, int h) {
+    // checks if this pixel is on the border of the selected area
+    static boolean isEdge(int x, int y, int w, int h) {
 
-            // already selected?
-            if (!selected[y][x]) return false;
+        // already selected?
+        if (!selected[y][x]) return false;
 
-            // border of image is automatically an edge
-            if (x == 0 || y == 0 || x == w - 1 || y == h - 1) return true;
+        // border of image is automatically an edge
+        if (x == 0 || y == 0 || x == w - 1 || y == h - 1) return true;
 
-            // edge if any 4-neighbor is not selected
-            return !selected[y][x - 1] || !selected[y][x + 1] || !selected[y - 1][x] || !selected[y + 1][x];
-        }
+        // edge if any 4-neighbor is not selected
+        return !selected[y][x - 1] || !selected[y][x + 1] || !selected[y - 1][x] || !selected[y + 1][x];
+    }
 }

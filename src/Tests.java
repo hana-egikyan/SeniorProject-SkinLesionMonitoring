@@ -37,7 +37,14 @@ public class Tests {
                 "dummy.png",
                 LocalDate.now(),
                 LocalTime.now().withSecond(0).withNano(0),
-                10, 1.0, 2.0, 3.0
+
+                10, 1.0, 2.0, 3.0,
+                0.0, 0.0, 0.0,
+
+                20,          // toleranceUsed
+                0, 255,      // minR, maxR
+                0, 255,      // minG, maxG
+                0, 255       // minB, maxB
         );
 
         java.io.File saved = ResultStorage.save(r);
@@ -55,7 +62,14 @@ public class Tests {
                 "a.png",
                 LocalDate.now(),
                 LocalTime.now().withSecond(0).withNano(0),
-                10, 10, 10, 10
+
+                10, 10, 10, 10,
+                0.0, 0.0, 0.0,
+
+                20,          // toleranceUsed
+                0, 255,      // minR, maxR
+                0, 255,      // minG, maxG
+                0, 255       // minB, maxB
         );
 
         // small delay so time differs
@@ -63,7 +77,14 @@ public class Tests {
                 "b.png",
                 LocalDate.now(),
                 LocalTime.now().withSecond(0).withNano(0).plusSeconds(1),
-                20, 20, 20, 20
+
+                20, 20, 20, 20,
+                0.0, 0.0, 0.0,
+
+                40,          // toleranceUsed
+                0, 255,      // minR, maxR
+                0, 255,      // minG, maxG
+                0, 255       // minB, maxB
         );
 
         ResultStorage.save(r1);

@@ -86,7 +86,7 @@ public class ResultStorage {
     public static List<AnalysisResult> loadAll() {
         List<AnalysisResult> results = new ArrayList<>();
 
-        File dataDir = new File("data");
+        File dataDir = new File(System.getProperty("user.dir") + File.separator + "data");
         if (!dataDir.exists() || !dataDir.isDirectory()) return results;
 
         File[] dayDirs = dataDir.listFiles();
