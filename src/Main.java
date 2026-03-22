@@ -120,28 +120,63 @@ public class Main {
 
                 String today = LocalDate.now().toString();
 
+                String nowTime = LocalTime.now().withSecond(0).withNano(0).toString();
+
                 String dateInput = (String) JOptionPane.showInputDialog(
                         frame,
-                        "enter date (YYYY-MM-DD) or leave blank for today",
-                        "date",
+                        "enter picture date (YYYY-MM-DD) or leave blank for today",
+                        "picture date",
                         JOptionPane.PLAIN_MESSAGE,
                         null,
                         null,
                         today
                 );
 
+                if (dateInput == null) {
+                    infoLabel.setText("analysis cancelled");
+                    return;
+                }
+
+                String timeInput = (String) JOptionPane.showInputDialog(
+                        frame,
+                        "enter picture time (HH:MM) or leave blank for current time",
+                        "picture time",
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        null,
+                        nowTime
+                );
+
+                if (timeInput == null) {
+                    infoLabel.setText("analysis cancelled");
+                    return;
+                }
+
                 LocalDate date;
                 try {
-                    if (dateInput == null || dateInput.trim().isEmpty()) {
+                    if (dateInput.trim().isEmpty()) {
                         date = LocalDate.now();
                     } else {
                         date = LocalDate.parse(dateInput.trim());
                     }
                 } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(frame,
+                            "invalid date format, using today");
                     date = LocalDate.now();
                 }
 
-                LocalTime time = LocalTime.now();
+                LocalTime time;
+                try {
+                    if (timeInput.trim().isEmpty()) {
+                        time = LocalTime.now().withSecond(0).withNano(0);
+                    } else {
+                        time = LocalTime.parse(timeInput.trim());
+                    }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(frame,
+                            "invalid time format, using current time");
+                    time = LocalTime.now().withSecond(0).withNano(0);
+                }
 
                 int minR = parseIntSafe(minRField.getText(), 0);
                 int maxR = parseIntSafe(maxRField.getText(), 255);
@@ -195,10 +230,12 @@ public class Main {
                         selectedCount
                 );
 
+                currentResult.acceptanceVerdict = verdict;
+
                 // show pass/fail clearly
                 setStage("acceptance: " + verdict);
 
-                infoLabel.setText("pixels " + currentResult.lesionPixelCount +
+                infoLabel.setText("Pixels " + currentResult.lesionPixelCount +
                         " avg rgb " +
                         String.format("%.2f", currentResult.avgR) + " " +
                         String.format("%.2f", currentResult.avgG) + " " +
@@ -244,13 +281,29 @@ public class Main {
 
                 java.util.List<AnalysisResult> all = ResultStorage.loadAll();
 
-                // DEBUG: show how many results were loaded
-                JOptionPane.showMessageDialog(frame, "loaded results: " + all.size());
-
                 setStage("computing forecast...");
 
+                String daysInput = JOptionPane.showInputDialog(
+                        frame,
+                        "enter forecast horizon in days",
+                        "7"
+                );
+
+                if (daysInput == null) {
+                    infoLabel.setText("forecast cancelled");
+                    return;
+                }
+
+                int daysAhead;
+                try {
+                    daysAhead = Integer.parseInt(daysInput.trim());
+                    if (daysAhead < 1) daysAhead = 7;
+                } catch (Exception ex) {
+                    daysAhead = 7;
+                }
+
                 TemporalForecaster.ForecastReport report =
-                        TemporalForecaster.buildReport(all, 7); // project 7 days ahead
+                        TemporalForecaster.buildReport(all, daysAhead);
 
                 setStage("done");
 
@@ -298,10 +351,11 @@ public class Main {
             // a panel to hold the button at the top
             JPanel topPanel = new JPanel();
             topPanel.add(loadButton);
+            topPanel.add(autoFillButton);
             topPanel.add(analyzeButton);
             topPanel.add(saveButton);
             topPanel.add(compareButton);
-            topPanel.add(autoFillButton);
+            topPanel.add(forecastButton);
 
             topPanel.add(new JLabel("tol:"));
             topPanel.add(toleranceField);
@@ -321,8 +375,6 @@ public class Main {
             topPanel.add(minBField);
             topPanel.add(new JLabel("-"));
             topPanel.add(maxBField);
-
-            topPanel.add(forecastButton);
 
             // a panel to hold the label at the bottom
             JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
