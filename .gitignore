@@ -3,3 +3,7 @@ out/
 *.class
 .DS_Store
 ~$*.docx
+
+# generated analysis outputs
+data/
+src/data/
