@@ -1,0 +1,11 @@
+imagePath=b.png
+date=2026-02-21
+time=16:55:01
+lesionPixelCount=20
+avgR=20.00
+avgG=20.00
+avgB=20.00
+varR=0.00
+varG=0.00
+varB=0.00
+

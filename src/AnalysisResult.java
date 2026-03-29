@@ -17,9 +17,13 @@ public class AnalysisResult {
 
     // the extracted features
     int lesionPixelCount;
+    int perimeterPixelCount;
+    double circularity;
     double avgR;
     double avgG;
     double avgB;
+    String acceptanceVerdict;
+
 
     // extra extracted features (color variance)
     double varR;
@@ -40,6 +44,8 @@ public class AnalysisResult {
                           LocalDate date,
                           LocalTime time,
                           int lesionPixelCount,
+                          int perimeterPixelCount,
+                          double circularity,
                           double avgR,
                           double avgG,
                           double avgB,
@@ -52,12 +58,15 @@ public class AnalysisResult {
                           int minG,
                           int maxG,
                           int minB,
-                          int maxB) {
+                          int maxB,
+                          String acceptanceVerdict) {
 
         this.imagePath = imagePath;
         this.date = date;
         this.time = time;
         this.lesionPixelCount = lesionPixelCount;
+        this.perimeterPixelCount = perimeterPixelCount;
+        this.circularity = circularity;
         this.avgR = avgR;
         this.avgG = avgG;
         this.avgB = avgB;
@@ -72,6 +81,7 @@ public class AnalysisResult {
         this.maxG = maxG;
         this.minB = minB;
         this.maxB = maxB;
+        this.acceptanceVerdict = acceptanceVerdict;
     }
 
     // convert to a readable .txt format
@@ -81,6 +91,9 @@ public class AnalysisResult {
                 "date=" + date + "\n" +
                 "time=" + time + "\n" +
                 "lesionPixelCount=" + lesionPixelCount + "\n" +
+                "acceptanceVerdict=" + acceptanceVerdict + "\n" +
+                "perimeterPixelCount=" + perimeterPixelCount + "\n" +
+                "circularity=" + String.format("%.6f", circularity) + "\n" +
                 "avgR=" + String.format("%.2f", avgR) + "\n" +
                 "avgG=" + String.format("%.2f", avgG) + "\n" +
                 "avgB=" + String.format("%.2f", avgB) + "\n" +
@@ -105,6 +118,8 @@ public class AnalysisResult {
         LocalDate date = LocalDate.now();
         LocalTime time = LocalTime.now();
         int count = 0;
+        int perimeterPixelCount = 0;
+        double circularity = 0;
 
         double avgR = 0;
         double avgG = 0;
@@ -122,6 +137,8 @@ public class AnalysisResult {
         int minB = 0;
         int maxB = 0;
 
+        String acceptanceVerdict = "NOT_CHECKED";
+
         String[] lines = text.split("\\R"); // split on any newline
 
         for (String line : lines) {
@@ -138,6 +155,9 @@ public class AnalysisResult {
                     case "date" -> date = LocalDate.parse(value);
                     case "time" -> time = LocalTime.parse(value);
                     case "lesionPixelCount" -> count = Integer.parseInt(value);
+                    case "perimeterPixelCount" -> perimeterPixelCount = Integer.parseInt(value);
+                    case "circularity" -> circularity = Double.parseDouble(value);
+                    case "acceptanceVerdict" -> acceptanceVerdict = value;
                     case "avgR" -> avgR = Double.parseDouble(value);
                     case "avgG" -> avgG = Double.parseDouble(value);
                     case "avgB" -> avgB = Double.parseDouble(value);
@@ -159,12 +179,14 @@ public class AnalysisResult {
 
         return new AnalysisResult(
                 imagePath, date, time, count,
+                perimeterPixelCount, circularity,
                 avgR, avgG, avgB,
                 varR, varG, varB,
                 toleranceUsed,
                 minR, maxR,
                 minG, maxG,
-                minB, maxB
+                minB, maxB,
+                acceptanceVerdict
         );
     }
 }

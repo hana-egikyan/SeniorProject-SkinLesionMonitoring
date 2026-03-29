@@ -19,7 +19,7 @@ public class TemporalForecaster {
         List<AnalysisResult> filtered = new ArrayList<>();
         filtered.add(results.get(0));
 
-        // keep only points that are at least 12 hours apart
+        // keep only chronologically later results and skip duplicate or non-increasing timestamps
         for (int i = 1; i < results.size(); i++) {
             AnalysisResult prevKept = filtered.get(filtered.size() - 1);
             AnalysisResult curr = results.get(i);

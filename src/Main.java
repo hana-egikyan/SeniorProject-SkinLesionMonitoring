@@ -42,6 +42,13 @@ public class Main {
     static JTextField maxBField = new JTextField("255", 3);
 
     static JTextField toleranceField = new JTextField("20", 3);
+
+    static final int PERF_MAX_W = 512;
+    static final int PERF_MAX_H = 512;
+    static final long PERF_TARGET_MS = 2000;
+
+    static long lastAnalysisDurationMs = -1;
+
     public static void main(String[] args)
      {
 
@@ -93,7 +100,11 @@ public class Main {
                         startY = -1;
 
                         // this tells the user what to do next
-                        infoLabel.setText("Click on the image to see pixel values");
+                        if (image.getWidth() <= PERF_MAX_W && image.getHeight() <= PERF_MAX_H) {
+                            infoLabel.setText("Click on the image to see pixel values (within 512x512 performance target)");
+                        } else {
+                            infoLabel.setText("Click on the image to see pixel values (image is larger than 512x512 target range)");
+                        }
 
                         // to tell swing to redraw the panel
                         imagePanel.repaint();
@@ -189,6 +200,9 @@ public class Main {
 
                 RgbRange range = new RgbRange(minR, maxR, minG, maxG, minB, maxB);
 
+                long analysisStartNs = System.nanoTime();
+
+
                 // if user has already clicked on the image, re-run region growing
                 if (startX >= 0 && startY >= 0) {
                     runRegionGrow(startX, startY, range);
@@ -221,6 +235,8 @@ public class Main {
                     return;
                 }
 
+                lastAnalysisDurationMs = (System.nanoTime() - analysisStartNs) / 1_000_000;
+
                 // acceptance criteria check (basic correctness rules)
                 String verdict = AcceptanceCriteria.validate(
                         selected,
@@ -235,7 +251,21 @@ public class Main {
                 // show pass/fail clearly
                 setStage("acceptance: " + verdict);
 
-                infoLabel.setText("Pixels " + currentResult.lesionPixelCount +
+                String perfText;
+
+                if (isWithinPerformanceTargetSize()) {
+                    if (lastAnalysisDurationMs <= PERF_TARGET_MS) {
+                        perfText = " performance OK (" + lastAnalysisDurationMs + " ms)";
+                    } else {
+                        perfText = " performance above target (" + lastAnalysisDurationMs + " ms)";
+                    }
+                } else {
+                    perfText = " runtime " + lastAnalysisDurationMs + " ms (image exceeds 512x512 target range)";
+                }
+
+                infoLabel.setText("Area " + currentResult.lesionPixelCount +
+                        " perimeter " + currentResult.perimeterPixelCount +
+                        " circularity " + String.format("%.4f", currentResult.circularity) +
                         " avg rgb " +
                         String.format("%.2f", currentResult.avgR) + " " +
                         String.format("%.2f", currentResult.avgG) + " " +
@@ -243,7 +273,7 @@ public class Main {
                         " var rgb " +
                         String.format("%.2f", currentResult.varR) + " " +
                         String.format("%.2f", currentResult.varG) + " " +
-                        String.format("%.2f", currentResult.varB));
+                        String.format("%.2f", currentResult.varB) + perfText);
 
                 setStage("acceptance: " + verdict);
                 imagePanel.repaint();
@@ -405,6 +435,12 @@ public class Main {
         } catch (Exception e) {
             return fallback;
         }
+    }
+
+    static boolean isWithinPerformanceTargetSize() {
+        return image != null &&
+                image.getWidth() <= PERF_MAX_W &&
+                image.getHeight() <= PERF_MAX_H;
     }
 
     // this starts selecting nearby pixels from the clicked one

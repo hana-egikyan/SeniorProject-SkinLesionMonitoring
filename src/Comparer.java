@@ -45,6 +45,13 @@ public class Comparer {
         double diffG = last.avgG - prev.avgG;
         double diffB = last.avgB - prev.avgB;
 
+        int diffPerimeter = last.perimeterPixelCount - prev.perimeterPixelCount;
+        double diffCircularity = last.circularity - prev.circularity;
+
+        double diffVarR = last.varR - prev.varR;
+        double diffVarG = last.varG - prev.varG;
+        double diffVarB = last.varB - prev.varB;
+
         String text = "";
         text += "Comparison of the Two Most Recent Saved Results\n\n";
 
@@ -52,24 +59,40 @@ public class Comparer {
         text += "Date: " + prev.date + "\n";
         text += "Time: " + prev.time.format(timeFmt) + "\n";
         text += "Area (pixels): " + prev.lesionPixelCount + "\n";
+        text += "Perimeter (boundary pixels): " + prev.perimeterPixelCount + "\n";
+        text += "Circularity: " + String.format("%.4f", prev.circularity) + "\n";
         text += "Average RGB: " + String.format("%.2f", prev.avgR) + ", "
                 + String.format("%.2f", prev.avgG) + ", "
-                + String.format("%.2f", prev.avgB) + "\n\n";
+                + String.format("%.2f", prev.avgB) + "\n";
+        text += "RGB Variance: " + String.format("%.2f", prev.varR) + ", "
+                + String.format("%.2f", prev.varG) + ", "
+                + String.format("%.2f", prev.varB) + "\n\n";
 
         text += "Current Result:\n";
         text += "Date: " + last.date + "\n";
         text += "Time: " + last.time.format(timeFmt) + "\n";
         text += "Area (pixels): " + last.lesionPixelCount + "\n";
+        text += "Perimeter (boundary pixels): " + last.perimeterPixelCount + "\n";
+        text += "Circularity: " + String.format("%.4f", last.circularity) + "\n";
         text += "Average RGB: " + String.format("%.2f", last.avgR) + ", "
                 + String.format("%.2f", last.avgG) + ", "
-                + String.format("%.2f", last.avgB) + "\n\n";
+                + String.format("%.2f", last.avgB) + "\n";
+        text += "RGB Variance: " + String.format("%.2f", last.varR) + ", "
+                + String.format("%.2f", last.varG) + ", "
+                + String.format("%.2f", last.varB) + "\n\n";
 
         text += "Observed Change:\n";
         text += "Area Difference: " + diffPixels + " pixels (" + String.format("%.2f", pct) + "%)\n";
+        text += "Perimeter Difference: " + diffPerimeter + "\n";
+        text += "Circularity Difference: " + String.format("%.4f", diffCircularity) + "\n";
         text += "Average RGB Difference: "
                 + String.format("%.2f", diffR) + ", "
                 + String.format("%.2f", diffG) + ", "
                 + String.format("%.2f", diffB) + "\n";
+        text += "RGB Variance Difference: "
+                + String.format("%.2f", diffVarR) + ", "
+                + String.format("%.2f", diffVarG) + ", "
+                + String.format("%.2f", diffVarB) + "\n";
 
         text += "\nInterpretation:\n";
         text += "Elapsed time: " + String.format("%.2f", elapsedDays) + " day(s)\n";

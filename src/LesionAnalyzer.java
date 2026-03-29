@@ -22,12 +22,16 @@ public class LesionAnalyzer {
         if (img == null || selected == null) {
             return new AnalysisResult(
                     imagePath, date, time,
-                    0, 0, 0, 0,
-                    0, 0, 0,
+                    0,    // lesionPixelCount
+                    0,    // perimeterPixelCount
+                    0,    // circularity
+                    0, 0, 0,   // avgR, avgG, avgB
+                    0, 0, 0,   // varR, varG, varB
                     toleranceUsed,
                     minR, maxR,
                     minG, maxG,
-                    minB, maxB
+                    minB, maxB,
+                    "NOT_CHECKED"
             );
         }
 
@@ -62,12 +66,16 @@ public class LesionAnalyzer {
         if (count == 0) {
             return new AnalysisResult(
                     imagePath, date, time,
-                    0, 0, 0, 0,
-                    0, 0, 0,
+                    0,    // lesionPixelCount
+                    0,    // perimeterPixelCount
+                    0,    // circularity
+                    0, 0, 0,   // avgR, avgG, avgB
+                    0, 0, 0,   // varR, varG, varB
                     toleranceUsed,
                     minR, maxR,
                     minG, maxG,
-                    minB, maxB
+                    minB, maxB,
+                    "NOT_CHECKED"
             );
         }
 
@@ -104,16 +112,50 @@ public class LesionAnalyzer {
         double varR = sumSqR / count;
         double varG = sumSqG / count;
         double varB = sumSqB / count;
+        int perimeter = computePerimeter4(selected, w, h);
+        double circularity = computeCircularity(count, perimeter);
 
         return new AnalysisResult(
                 imagePath, date, time,
-                count,
+                count, perimeter, circularity,
                 avgR, avgG, avgB,
                 varR, varG, varB,
                 toleranceUsed,
                 minR, maxR,
                 minG, maxG,
-                minB, maxB
+                minB, maxB,
+                "NOT_CHECKED"
         );
+
     }
+        // counts lesion pixels that touch at least one non-lesion 4-neighbor
+        static int computePerimeter4(boolean[][] selected, int w, int h) {
+            int perimeter = 0;
+
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    if (!selected[y][x]) continue;
+
+                    if (x == 0 || y == 0 || x == w - 1 || y == h - 1 ||
+                            !selected[y][x - 1] ||
+                            !selected[y][x + 1] ||
+                            !selected[y - 1][x] ||
+                            !selected[y + 1][x]) {
+                        perimeter++;
+                    }
+                }
+            }
+
+            return perimeter;
+        }
+
+        static double computeCircularity(int area, int perimeter) {
+            if (area <= 0 || perimeter <= 0) return 0;
+
+            double c = (4.0 * Math.PI * area) / (perimeter * (double) perimeter);
+
+            if (c < 0) return 0;
+            return Math.min(c, 1.0);
+        }
+
 }
