@@ -8,10 +8,10 @@ public class AcceptanceCriteria {
                                   AnalysisResult result,
                                   int selectedCount) {
 
-        // 1) must have a selection mask
+        // must have a selection mask
         if (selected == null) return "FAIL: selection mask is null";
 
-        // 2) bounded growth: mask should match the image size
+        // bounded growth: mask should match the image size
         if (selected.length != imageH) return "FAIL: mask height mismatch";
         for (int y = 0; y < imageH; y++) {
             if (selected[y] == null || selected[y].length != imageW) {
@@ -19,17 +19,17 @@ public class AcceptanceCriteria {
             }
         }
 
-        // 3) non-zero segmentation (region must exist)
+        // non-zero segmentation (region must exist)
         if (selectedCount <= 0) return "FAIL: no pixels selected";
         if (result == null) return "FAIL: result is null";
         if (result.lesionPixelCount <= 0) return "FAIL: lesionPixelCount is 0";
 
-        // 4) "bounded" growth: should not explode to most of the image
-        // (this number is a simple safety rule, you can tune it later)
+        // "bounded" growth: should not explode to most of the image
+        // this number is a simple safety rule
         int maxAllowed = (int)(imageW * imageH * 0.80);
         if (selectedCount > maxAllowed) return "FAIL: region too large (possible leak)";
 
-        // 5) metrics should be valid (not NaN / not crazy)
+        // metrics should be valid
         if (Double.isNaN(result.avgR) || Double.isNaN(result.avgG) || Double.isNaN(result.avgB)) {
             return "FAIL: NaN averages";
         }

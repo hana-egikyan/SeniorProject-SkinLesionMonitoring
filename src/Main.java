@@ -13,11 +13,11 @@ import java.time.LocalTime;
 public class Main {
 
     // this variable will store the image after we load it
-    // we keep it here so other parts of the program can use it
+    // it is here so other parts of the program can use it
     static BufferedImage image = null;
 
     // this is for showing simple info to the user
-    // later this will help when we start using thresholds
+    // later this will help for starting the use of thresholds
     static JLabel infoLabel = new JLabel("Click load image to choose a file");
 
     // bfs region growing prototype - storing the pixels and the starting pixels, how many are selected, how similar they need to be
@@ -29,6 +29,7 @@ public class Main {
 
     // path of the currently loaded image (used when saving results)
     static String currentImagePath = "";
+    static String currentSeriesId = "";
 
     // stores the most recent analysis result
     static AnalysisResult currentResult = null;
@@ -47,6 +48,15 @@ public class Main {
     static final int PERF_MAX_H = 512;
     static final long PERF_TARGET_MS = 2000;
 
+    // hard upper bound on how many pixels region growing is allowed to accept
+    // before it self-terminates. this is an image-independent runtime safeguard
+    // against runaway expansion. a separate, image-dependent acceptance rule in
+    // AcceptanceCriteria additionally rejects any result whose selected region
+    // exceeds 80% of the image area. the two safeguards are complementary:
+    // this one limits CPU work inside the inner loop; the other validates the
+    // final region size against the image once growing has finished.
+    static final int REGION_GROW_HARD_CAP = 80000;
+
     static long lastAnalysisDurationMs = -1;
 
     public static void main(String[] args)
@@ -62,14 +72,14 @@ public class Main {
             frame.setSize(800, 600);
 
             // this button lets the user choose an image file
-            JButton loadButton = new JButton("load image");
+            JButton loadButton = new JButton("Load image");
 
             // new buttons for analysis and saving results and comparing latest two saved images
-            JButton analyzeButton = new JButton("analyze");
-            JButton saveButton = new JButton("save");
-            JButton compareButton = new JButton("compare latest 2");
-            JButton autoFillButton = new JButton("use clicked color");
-            JButton forecastButton = new JButton("forecast");
+            JButton analyzeButton = new JButton("Analyze");
+            JButton saveButton = new JButton("Save result");
+            JButton compareButton = new JButton("Compare with Previous");
+            JButton autoFillButton = new JButton("Auto-Fill RGB Range");
+            JButton forecastButton = new JButton("Forecast Trend");
 
 
             // this panel will be used to draw the image
@@ -111,7 +121,7 @@ public class Main {
                     } catch (Exception ex) {
                         // this shows an error if the image fails to load
                         JOptionPane.showMessageDialog(frame,
-                                "image could not be loaded");
+                                "Image could not be loaded.");
                     }
                 }
             });
@@ -120,12 +130,12 @@ public class Main {
             analyzeButton.addActionListener(e -> {
 
                 if (image == null) {
-                    infoLabel.setText("load an image first");
+                    infoLabel.setText("Load an image first.");
                     return;
                 }
 
                 if (startX < 0 || startY < 0) {
-                    setStage("click on the lesion first");
+                    setStage("Click on the lesion first.");
                     return;
                 }
 
@@ -135,8 +145,8 @@ public class Main {
 
                 String dateInput = (String) JOptionPane.showInputDialog(
                         frame,
-                        "enter picture date (YYYY-MM-DD) or leave blank for today",
-                        "picture date",
+                        "Enter picture date (YYYY-MM-DD) or leave blank for today.",
+                        "Picture date",
                         JOptionPane.PLAIN_MESSAGE,
                         null,
                         null,
@@ -144,14 +154,14 @@ public class Main {
                 );
 
                 if (dateInput == null) {
-                    infoLabel.setText("analysis cancelled");
+                    infoLabel.setText("Analysis cancelled");
                     return;
                 }
 
                 String timeInput = (String) JOptionPane.showInputDialog(
                         frame,
-                        "enter picture time (HH:MM) or leave blank for current time",
-                        "picture time",
+                        "Enter picture time (HH:MM) or leave blank for current time",
+                        "Picture time",
                         JOptionPane.PLAIN_MESSAGE,
                         null,
                         null,
@@ -159,7 +169,7 @@ public class Main {
                 );
 
                 if (timeInput == null) {
-                    infoLabel.setText("analysis cancelled");
+                    infoLabel.setText("Analysis cancelled");
                     return;
                 }
 
@@ -172,20 +182,20 @@ public class Main {
                     }
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(frame,
-                            "invalid date format, using today");
+                            "Invalid date format, using today");
                     date = LocalDate.now();
                 }
 
                 LocalTime time;
                 try {
                     if (timeInput.trim().isEmpty()) {
-                        time = LocalTime.now().withSecond(0).withNano(0);
+                        time = LocalTime.now().withNano(0);
                     } else {
                         time = LocalTime.parse(timeInput.trim());
                     }
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(frame,
-                            "invalid time format, using current time");
+                            "Invalid time format, using current time");
                     time = LocalTime.now().withSecond(0).withNano(0);
                 }
 
@@ -202,16 +212,16 @@ public class Main {
 
                 long analysisStartNs = System.nanoTime();
 
+                // determinism sanity check:
+                // run region growing twice with identical inputs and compare the resulting region sizes. since the algorithm is deterministic by
+                // design (same seed, same range, same visitation matrix), these counts should always match. this check exists to catch any
+                // future regression that accidentally introduces nondeterminism (e.g. parallel expansion, hash-based ordering, shared state
+                // bleeding between runs). if the counts are different, the result is rejected before being analyzed or saved.
 
-                // if user has already clicked on the image, re-run region growing
-                if (startX >= 0 && startY >= 0) {
-                    runRegionGrow(startX, startY, range);
-                }
-
+                runRegionGrow(startX, startY, range);
                 int count1 = selectedCount;
 
                 runRegionGrow(startX, startY, range);
-
                 int count2 = selectedCount;
 
                 if (count1 != count2) {
@@ -220,10 +230,30 @@ public class Main {
                     return;
                 }
 
+                String seriesInput = (String) JOptionPane.showInputDialog(
+                        frame,
+                        "Enter lesion series ID (use the same ID for the same lesion over time)",
+                        "Lesion series",
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        null,
+                        currentSeriesId.isBlank() ? "lesion1" : currentSeriesId
+                );
+
+                if (seriesInput == null) {
+                    infoLabel.setText("Analysis cancelled");
+                    return;
+                }
+
+                currentSeriesId = seriesInput.trim();
+                if (currentSeriesId.isEmpty()) {
+                    currentSeriesId = "lesion1";
+                }
+
                 // if bfs selection exists analyze that region
                 if (selected != null && selectedCount > 0) {
                     currentResult = LesionAnalyzer.analyzeFromSelected(
-                            image, selected, currentImagePath, date, time,
+                            image, selected, currentImagePath, currentSeriesId, date, time,
                             tol,
                             minR, maxR,
                             minG, maxG,
@@ -231,7 +261,7 @@ public class Main {
                     );
                 } else {
                     // no selection yet -> tell the user to click + select first
-                    infoLabel.setText("select a region first (click image) then analyze");
+                    infoLabel.setText("Select a region first (click image) then analyze");
                     return;
                 }
 
@@ -275,7 +305,7 @@ public class Main {
                         String.format("%.2f", currentResult.varG) + " " +
                         String.format("%.2f", currentResult.varB) + perfText);
 
-                setStage("acceptance: " + verdict);
+                setStage("acceptance: " + verdict + " | " + lastAnalysisDurationMs + " ms");
                 imagePanel.repaint();
 
             });
@@ -297,30 +327,47 @@ public class Main {
             // this runs when compare is clicked
             compareButton.addActionListener(e -> {
 
-                java.util.List<AnalysisResult> all = ResultStorage.loadAll();
+                if (currentImagePath == null || currentImagePath.isBlank()) {
+                    infoLabel.setText("Load the lesion image first");
+                    return;
+                }
 
-                String text = Comparer.compareLatestTwo(all);
+                java.util.List<AnalysisResult> filtered = getRelevantSavedResults();
 
-                JOptionPane.showMessageDialog(frame, text);
+                if (filtered.size() < 2) {
+                    JOptionPane.showMessageDialog(
+                            frame,
+                            "Not enough PASS results for the currently loaded image.\n" +
+                                    "Current image: " + currentImageName() + "\n" +
+                                    "Current series: " + currentSeriesId + "\n" +
+                                    "Need at least 2 saved analyses in the same lesion series."
+                    );
+                    return;
+                }
+
+                showComparisonDialog(frame, filtered);
             });
 
             // this runs when forecast is clicked
             forecastButton.addActionListener(e -> {
 
-                setStage("loading saved results...");
+                if (currentImagePath == null || currentImagePath.isBlank()) {
+                    infoLabel.setText("Load the lesion image first");
+                    return;
+                }
 
-                java.util.List<AnalysisResult> all = ResultStorage.loadAll();
+                setStage("Loading relevant saved results...");
 
-                setStage("computing forecast...");
+                java.util.List<AnalysisResult> filtered = getRelevantSavedResults();
 
                 String daysInput = JOptionPane.showInputDialog(
                         frame,
-                        "enter forecast horizon in days",
+                        "How many days ahead? (project the trend this far into the future)",
                         "7"
                 );
 
                 if (daysInput == null) {
-                    infoLabel.setText("forecast cancelled");
+                    infoLabel.setText("Forecast cancelled");
                     return;
                 }
 
@@ -332,25 +379,47 @@ public class Main {
                     daysAhead = 7;
                 }
 
+                if (filtered.size() < 2) {
+                    setStage("Done");
+                    JOptionPane.showMessageDialog(
+                            frame,
+                            "Not enough PASS results for forecasting on the currently loaded image.\n" +
+                                    "Current image: " + currentImageName() + "\n" +
+                                    "Need at least 2 saved accepted analyses in the same lesion series."
+                    );
+                    return;
+                }
+
+                setStage("Computing forecast...");
+
                 TemporalForecaster.ForecastReport report =
-                        TemporalForecaster.buildReport(all, daysAhead);
+                        TemporalForecaster.buildReport(filtered, daysAhead);
 
-                setStage("done");
+                setStage("Done");
 
-                JOptionPane.showMessageDialog(frame, report.toText());
-            });
+                javax.swing.JTextArea textArea = new javax.swing.JTextArea(report.toText());
+                textArea.setEditable(false);
+                textArea.setLineWrap(true);
+                textArea.setWrapStyleWord(true);
+                textArea.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 13));
+                textArea.setCaretPosition(0);
+
+                javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(textArea);
+                scrollPane.setPreferredSize(new java.awt.Dimension(560, 480));
+
+                JOptionPane.showMessageDialog(frame, scrollPane, "Forecast Report", JOptionPane.INFORMATION_MESSAGE);            });
 
 
             // this runs when the "use clicked color" button is pressed
             autoFillButton.addActionListener(e -> {
 
                 if (image == null) {
-                    infoLabel.setText("load an image first");
+                    infoLabel.setText("Load an image first");
                     return;
                 }
 
                 if (startX < 0 || startY < 0) {
-                    infoLabel.setText("click on the image first");
+                    infoLabel.setText("Click on the image first");
                     return;
                 }
 
@@ -406,13 +475,28 @@ public class Main {
             topPanel.add(new JLabel("-"));
             topPanel.add(maxBField);
 
+            // wrap the top panel in a scroll pane
+            JScrollPane topScroll = new JScrollPane(
+                    topPanel,
+                    JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+                    JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+            );
+            topScroll.setBorder(null);
+            topScroll.getHorizontalScrollBar().setUnitIncrement(16);
+
+            // lock the height so the scroll pane doesn't steal vertical space
+            topScroll.setPreferredSize(new Dimension(
+                    800,
+                    topPanel.getPreferredSize().height + 18  // +18 for scrollbar
+            ));
+
             // a panel to hold the label at the bottom
             JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
             bottomPanel.add(infoLabel);
 
             // this arranges everything in the window
             frame.setLayout(new BorderLayout());
-            frame.add(topPanel, BorderLayout.NORTH);
+            frame.add(topScroll, BorderLayout.NORTH);
             frame.add(imagePanel, BorderLayout.CENTER);
             frame.add(bottomPanel, BorderLayout.SOUTH);
 
@@ -422,6 +506,98 @@ public class Main {
             // this makes the window visible
             frame.setVisible(true);
         });
+    }
+
+    static JLabel buildImagePreview(AnalysisResult r, int maxW, int maxH) {
+        try {
+            BufferedImage img = ImageIO.read(new File(r.imagePath));
+            if (img != null) {
+                Image scaled = img.getScaledInstance(maxW, maxH, Image.SCALE_SMOOTH);
+                ImageIcon icon = new ImageIcon(scaled);
+
+                String caption = "<html><center>"
+                        + "Date: " + r.date + "<br>"
+                        + "Time: " + r.time + "<br>"
+                        + "Series: " + r.seriesId
+                        + "</center></html>";
+
+                JLabel label = new JLabel(caption, icon, SwingConstants.CENTER);
+                label.setHorizontalTextPosition(SwingConstants.CENTER);
+                label.setVerticalTextPosition(SwingConstants.BOTTOM);
+                return label;
+            }
+        } catch (Exception ignored) {
+        }
+
+        String fallback = "<html><center>No image preview available<br>"
+                + "Date: " + r.date + "<br>"
+                + "Time: " + r.time + "<br>"
+                + "Series: " + r.seriesId
+                + "</center></html>";
+
+        return new JLabel(fallback, SwingConstants.CENTER);
+    }
+
+    static void showComparisonDialog(JFrame frame, java.util.List<AnalysisResult> filtered) {
+        if (filtered == null || filtered.size() < 2) return;
+
+        AnalysisResult previous = filtered.get(filtered.size() - 2);
+        AnalysisResult current = filtered.get(filtered.size() - 1);
+
+        String text = Comparer.compareLatestTwo(filtered);
+
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+
+        JPanel imagesPanel = new JPanel(new GridLayout(1, 2, 10, 10));
+        imagesPanel.add(buildImagePreview(previous, 220, 220));
+        imagesPanel.add(buildImagePreview(current, 220, 220));
+
+        JTextArea textArea = new JTextArea(text);
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(520, 260));
+
+        mainPanel.add(imagesPanel, BorderLayout.NORTH);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JOptionPane.showMessageDialog(
+                frame,
+                mainPanel,
+                "Comparison of Latest Two Accepted Results",
+                JOptionPane.PLAIN_MESSAGE
+        );
+    }
+
+    // keeps only PASS results from the same lesion series as the currently loaded analysis
+    static java.util.List<AnalysisResult> getRelevantSavedResults() {
+
+        java.util.List<AnalysisResult> all = ResultStorage.loadAll();
+        java.util.List<AnalysisResult> filtered = new java.util.ArrayList<>();
+
+        if (currentImagePath == null || currentImagePath.isBlank()) {
+            return filtered;
+        }
+
+        for (AnalysisResult r : all) {
+            if (r == null) continue;
+            if (r.imagePath == null) continue;
+            if (!currentSeriesId.equals(r.seriesId)) continue;
+            if (r.acceptanceVerdict == null) continue;
+            if (!r.acceptanceVerdict.startsWith("PASS")) continue;
+
+            filtered.add(r);
+        }
+
+        return filtered;
+    }
+
+    // optional helper
+    static String currentImageName() {
+        if (currentImagePath == null || currentImagePath.isBlank()) return "(no image loaded)";
+        return new java.io.File(currentImagePath).getName();
     }
 
     // small helper so we can show what stage we are in that uses SwingUtilities so it updates safely
@@ -477,8 +653,9 @@ public class Main {
             tryAdd(x, y + 1, range, queue, w, h);
             tryAdd(x, y - 1, range, queue, w, h);
 
-            // safety stop so it cannot grow forever
-            if (selectedCount > 80000) break;
+            // image-independent runtime safeguard: see REGION_GROW_HARD_CAP
+            // declaration for the relationship to AcceptanceCriteria's 80% rule.
+            if (selectedCount > REGION_GROW_HARD_CAP) break;
         }
 
         // show end stage + result size

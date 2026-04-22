@@ -12,6 +12,7 @@ public class LesionAnalyzer {
     public static AnalysisResult analyzeFromSelected(BufferedImage img,
                                                      boolean[][] selected,
                                                      String imagePath,
+                                                     String seriesId,
                                                      LocalDate date,
                                                      LocalTime time,
                                                      int toleranceUsed,
@@ -21,7 +22,7 @@ public class LesionAnalyzer {
 
         if (img == null || selected == null) {
             return new AnalysisResult(
-                    imagePath, date, time,
+                    imagePath, seriesId, date, time,
                     0,    // lesionPixelCount
                     0,    // perimeterPixelCount
                     0,    // circularity
@@ -44,7 +45,7 @@ public class LesionAnalyzer {
         int h = img.getHeight();
         int w = img.getWidth();
 
-        // -------- FIRST PASS: compute averages --------
+        // FIRST PASS: compute averages
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
 
@@ -65,7 +66,7 @@ public class LesionAnalyzer {
 
         if (count == 0) {
             return new AnalysisResult(
-                    imagePath, date, time,
+                    imagePath, seriesId, date, time,
                     0,    // lesionPixelCount
                     0,    // perimeterPixelCount
                     0,    // circularity
@@ -83,7 +84,7 @@ public class LesionAnalyzer {
         double avgG = (double) sumG / count;
         double avgB = (double) sumB / count;
 
-        // -------- SECOND PASS: compute variance --------
+        //SECOND PASS: compute variance
         double sumSqR = 0;
         double sumSqG = 0;
         double sumSqB = 0;
@@ -116,7 +117,7 @@ public class LesionAnalyzer {
         double circularity = computeCircularity(count, perimeter);
 
         return new AnalysisResult(
-                imagePath, date, time,
+                imagePath, seriesId, date, time,
                 count, perimeter, circularity,
                 avgR, avgG, avgB,
                 varR, varG, varB,

@@ -10,6 +10,7 @@ public class AnalysisResult {
 
     // path to the analyzed image file (as chosen by the user)
     String imagePath;
+    String seriesId;
 
     // date/time when the result was saved
     LocalDate date;
@@ -41,6 +42,7 @@ public class AnalysisResult {
 
     // constructor used by the analyzer = storage for the values
     public AnalysisResult(String imagePath,
+                          String seriesId,
                           LocalDate date,
                           LocalTime time,
                           int lesionPixelCount,
@@ -62,6 +64,7 @@ public class AnalysisResult {
                           String acceptanceVerdict) {
 
         this.imagePath = imagePath;
+        this.seriesId = seriesId;
         this.date = date;
         this.time = time;
         this.lesionPixelCount = lesionPixelCount;
@@ -88,6 +91,7 @@ public class AnalysisResult {
     public String toTextBlock() {
 
         return "imagePath=" + imagePath + "\n" +
+                "seriesId=" + seriesId + "\n" +
                 "date=" + date + "\n" +
                 "time=" + time + "\n" +
                 "lesionPixelCount=" + lesionPixelCount + "\n" +
@@ -115,6 +119,7 @@ public class AnalysisResult {
         if (text == null) return null;
 
         String imagePath = "";
+        String seriesId = "";
         LocalDate date = LocalDate.now();
         LocalTime time = LocalTime.now();
         int count = 0;
@@ -152,6 +157,7 @@ public class AnalysisResult {
             try {
                 switch (key) {
                     case "imagePath" -> imagePath = value;
+                    case "seriesId" -> seriesId = value;
                     case "date" -> date = LocalDate.parse(value);
                     case "time" -> time = LocalTime.parse(value);
                     case "lesionPixelCount" -> count = Integer.parseInt(value);
@@ -178,7 +184,7 @@ public class AnalysisResult {
         }
 
         return new AnalysisResult(
-                imagePath, date, time, count,
+                imagePath, seriesId, date, time, count,
                 perimeterPixelCount, circularity,
                 avgR, avgG, avgB,
                 varR, varG, varB,

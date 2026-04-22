@@ -56,6 +56,7 @@ public class Comparer {
         text += "Comparison of the Two Most Recent Saved Results\n\n";
 
         text += "Previous Result:\n";
+        text += "Image: " + prev.imagePath + "\n";
         text += "Date: " + prev.date + "\n";
         text += "Time: " + prev.time.format(timeFmt) + "\n";
         text += "Area (pixels): " + prev.lesionPixelCount + "\n";
@@ -69,6 +70,7 @@ public class Comparer {
                 + String.format("%.2f", prev.varB) + "\n\n";
 
         text += "Current Result:\n";
+        text += "Image: " + last.imagePath + "\n";
         text += "Date: " + last.date + "\n";
         text += "Time: " + last.time.format(timeFmt) + "\n";
         text += "Area (pixels): " + last.lesionPixelCount + "\n";
@@ -105,8 +107,8 @@ public class Comparer {
             text += "The detected lesion region size stayed the same between the two saved observations.\n";
         }
 
-        double prevIntensity = (prev.avgR + prev.avgG + prev.avgB) / 3.0;
-        double lastIntensity = (last.avgR + last.avgG + last.avgB) / 3.0;
+        double prevIntensity = 0.299 * prev.avgR + 0.587 * prev.avgG + 0.114 * prev.avgB;
+        double lastIntensity = 0.299 * last.avgR + 0.587 * last.avgG + 0.114 * last.avgB;
         double intensityDiff = lastIntensity - prevIntensity;
 
         if (intensityDiff > 1) {

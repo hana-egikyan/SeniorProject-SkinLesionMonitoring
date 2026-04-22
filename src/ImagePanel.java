@@ -13,7 +13,7 @@ public class ImagePanel extends JPanel {
             @Override
             public void mouseClicked(MouseEvent e) {
 
-                // if no image is loaded we do nothing
+                // if no image is loaded
                 if (Main.image == null) {
                     Main.infoLabel.setText("load an image first");
                     return;
@@ -56,7 +56,7 @@ public class ImagePanel extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        // if no image is loaded we show a message
+        // if no image is loaded this is the message that shows
         if (Main.image == null) {
             return;
         }

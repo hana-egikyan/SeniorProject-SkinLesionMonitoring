@@ -6,6 +6,27 @@ import java.util.List;
 // this is for saving + loading results
 public class ResultStorage {
 
+    // base directory where results are saved.
+    // defaults to "data" for normal application use, but tests can
+    // override this to redirect to a separate temporary location so
+    // they do not pollute the real data folder.
+    private static String baseDir = "data";
+
+    // allows tests (or any caller) to redirect persistence to a
+    // different directory. passing null or blank resets to the default.
+    public static void setBaseDir(String dir) {
+        if (dir == null || dir.isBlank()) {
+            baseDir = "data";
+        } else {
+            baseDir = dir;
+        }
+    }
+
+    // returns the current base directory.
+    public static String getBaseDir() {
+        return baseDir;
+    }
+
     // tries to create a folder if it does not exist
     // returns true if the folder exists after this (created or already existed)
     private static boolean ensureDirExists(File dir) {
@@ -20,12 +41,12 @@ public class ResultStorage {
         return dir.mkdirs();
     }
 
-    // simple error logging to a text file (no external libraries)
+    // simple error logging to a text file
     private static void logError(String message, Exception e) {
         System.err.println(message);
         if (e != null) System.err.println(e.getMessage());
 
-        File logFile = new File("data" + File.separator + "errors.log");
+        File logFile = new File(baseDir + File.separator + "errors.log");
 
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(logFile, true))) {
             bw.write("[" + java.time.LocalDateTime.now() + "] " + message);
@@ -38,12 +59,12 @@ public class ResultStorage {
 
             bw.newLine();
         } catch (IOException ignored) {
-            // if logging fails we do not want the program to crash
+            // if logging fails so that the program wont crash
         }
     }
 
     private static File buildResultFile(LocalDate date) {
-        File dir = new File("data" + File.separator + date.toString());
+        File dir = new File(baseDir + File.separator + date.toString());
 
         // create folder for that day (and check if it worked)
         boolean created = ensureDirExists(dir);
@@ -69,7 +90,7 @@ public class ResultStorage {
                 return null;
             }
 
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(file, true))) {
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(file, false))) {
                 bw.write(result.toTextBlock());
                 bw.newLine();
             }
@@ -86,7 +107,7 @@ public class ResultStorage {
     public static List<AnalysisResult> loadAll() {
         List<AnalysisResult> results = new ArrayList<>();
 
-        File dataDir = new File(System.getProperty("user.dir") + File.separator + "data");
+        File dataDir = new File(System.getProperty("user.dir") + File.separator + baseDir);
         if (!dataDir.exists() || !dataDir.isDirectory()) return results;
 
         File[] dayDirs = dataDir.listFiles();

@@ -38,7 +38,7 @@ public class RgbRange {
         );
     }
 
-    // clamps a value between 0 and 255
+    // secure a value between 0 and 255
     private static int clamp(int v) {
         return Math.max(0, Math.min(255, v));
     }
